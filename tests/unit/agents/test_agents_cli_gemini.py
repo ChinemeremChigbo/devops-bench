@@ -201,6 +201,7 @@ def test_build_env_vertex_key_routes_to_cloud_api_key(monkeypatch: pytest.Monkey
     monkeypatch.setenv("GCP_PROJECT_ID", "proj-a")
     env = _build_env(AgentConfig(model="gemini-2.5-pro", api_key="abc", provider="google-vertex"))
     assert env["GOOGLE_CLOUD_API_KEY"] == "abc"
+    assert env["GOOGLE_GENAI_USE_VERTEXAI"] == "true"
     assert "GEMINI_API_KEY" not in env and "GOOGLE_API_KEY" not in env
 
 
@@ -208,6 +209,7 @@ def test_build_env_keyless_writes_no_key_var(monkeypatch: pytest.MonkeyPatch) ->
     # No api_key (Vertex/ADC): no key env var is written regardless of provider.
     monkeypatch.setenv("GCP_PROJECT_ID", "proj-a")
     env = _build_env(AgentConfig(model="gemini-2.5-pro", provider="google-vertex"))
+    assert env["GOOGLE_GENAI_USE_VERTEXAI"] == "true"
     assert not {"GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_CLOUD_API_KEY"} & env.keys()
 
 
@@ -674,6 +676,78 @@ def test_execute_cleans_up_temp_working_dir_after_run(monkeypatch: pytest.Monkey
 # ---------------------------------------------------------------------------
 # MCP server wiring: settings.json mcpServers reach the binary's cwd.
 # ---------------------------------------------------------------------------
+
+
+def test_execute_seeds_container_home_folder_trust_when_sandboxed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The container HOME is fresh, so the user-level folder-trust disable the
+    bastion relies on does not exist there — without seeding it a sandboxed
+    MCP arm silently runs without MCP while still recording MCP as granted."""
+    import json as _json
+
+    from devops_bench.agents.capabilities import AllCapabilities, McpBinding
+    from devops_bench.agents.sandbox import SandboxSpec
+
+    caps = AllCapabilities(mcp_servers=(McpBinding(name="k8s", command=("/bin/mcp",)),))
+    agent = GeminiCliAgent(
+        AgentConfig(target="gemini", capabilities=caps, sandbox=SandboxSpec(image="img"))
+    )
+    monkeypatch.setattr(
+        GeminiCliAgent,
+        "run_agent_cmd",
+        lambda self, argv, **kwargs: SimpleNamespace(stdout="", stderr="", returncode=0),
+    )
+    agent._execute("p", workspace_path=tmp_path)  # noqa: SLF001
+
+    seeded = tmp_path / "home" / ".gemini" / "settings.json"
+    assert seeded.exists()
+    assert _json.loads(seeded.read_text()) == {"security": {"folderTrust": {"enabled": False}}}
+
+
+def test_execute_seeds_folder_trust_even_without_mcp_or_skills(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A baseline or rules-only sandboxed arm needs the seed too: untrusted,
+    the CLI also drops GEMINI.md and downgrades --approval-mode, not just
+    the workspace MCP settings."""
+    from devops_bench.agents.sandbox import SandboxSpec
+
+    agent = GeminiCliAgent(AgentConfig(target="gemini", sandbox=SandboxSpec(image="img")))
+    monkeypatch.setattr(
+        GeminiCliAgent,
+        "run_agent_cmd",
+        lambda self, argv, **kwargs: SimpleNamespace(stdout="", stderr="", returncode=0),
+    )
+    agent._execute("p", workspace_path=tmp_path)  # noqa: SLF001
+    assert (tmp_path / "home" / ".gemini" / "settings.json").exists()
+
+
+def test_execute_does_not_seed_folder_trust_when_unsandboxed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from devops_bench.agents.capabilities import AllCapabilities, McpBinding
+
+    caps = AllCapabilities(mcp_servers=(McpBinding(name="k8s", command=("/bin/mcp",)),))
+    agent = GeminiCliAgent(AgentConfig(target="gemini", capabilities=caps))
+    monkeypatch.setattr(
+        GeminiCliAgent,
+        "run_agent_cmd",
+        lambda self, argv, **kwargs: SimpleNamespace(stdout="", stderr="", returncode=0),
+    )
+    agent._execute("p", workspace_path=tmp_path)  # noqa: SLF001
+    assert not (tmp_path / "home" / ".gemini").exists()
+
+
+def test_execute_refuses_a_host_home_target_when_sandboxed(tmp_path: Path) -> None:
+    """expanduser resolves ~ against the HOST home; the resulting path cannot
+    exist in the image, so refuse loudly instead of a confusing exec failure."""
+    from devops_bench.agents.sandbox import SandboxSpec
+    from devops_bench.core import SandboxError
+
+    agent = GeminiCliAgent(AgentConfig(target="~/bin/gemini", sandbox=SandboxSpec(image="img")))
+    with pytest.raises(SandboxError, match="host home"):
+        agent._execute("p", workspace_path=tmp_path)  # noqa: SLF001
 
 
 def test_build_settings_combines_mcp_servers_and_skills_flag() -> None:
