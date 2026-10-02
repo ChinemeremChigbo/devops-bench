@@ -83,6 +83,47 @@ else
     || echo "    WARN: gemini CLI install failed; gcli agent runs will not work until it's installed."
 fi
 
+# Block the link-local metadata endpoint (169.254.169.254) for containers
+# only: it would hand a sandboxed agent this VM's cloud-platform-scoped
+# service account token, voiding the scoped credentials. DOCKER-USER applies
+# to *forwarded* traffic only, so host processes — ambient (unsandboxed)
+# runs and the matrix — keep authenticating through the metadata server.
+#
+# Port 53 must stay open: on a GCP VM the metadata address is also the
+# resolver dockerd copies into default-bridge containers, so a blanket REJECT
+# breaks all container DNS (kind hides this — its embedded DNS at 127.0.0.11
+# forwards from the host namespace, where DOCKER-USER does not apply). The
+# token endpoints are HTTP on port 80, so they stay rejected, and a DNS
+# answer cannot carry a credential. Order matters (the ACCEPTs must sit above
+# the REJECT) and must not depend on what an earlier run or a debugging session
+# left behind, so all three are removed and re-inserted at the head every run.
+#
+# iptables rules do not survive a reboot and DOCKER-USER is created by
+# dockerd: re-run this script after a reboot. See docs/components/infra.md.
+echo "==> metadata endpoint block (container egress)"
+if ! command -v iptables >/dev/null 2>&1; then
+  echo "    WARN: iptables not found; containers can still reach the metadata server."
+elif ! sudo iptables -L DOCKER-USER -n >/dev/null 2>&1; then
+  echo "    WARN: no DOCKER-USER chain yet (is dockerd running?); re-run after Docker starts."
+else
+  reject="-d 169.254.169.254 -j REJECT"
+  accept_udp="-d 169.254.169.254 -p udp --dport 53 -j ACCEPT"
+  accept_tcp="-d 169.254.169.254 -p tcp --dport 53 -j ACCEPT"
+  # shellcheck disable=SC2086  # the rule specs are deliberately word-split
+  for rule in "$accept_tcp" "$accept_udp" "$reject"; do
+    while sudo iptables -C DOCKER-USER $rule >/dev/null 2>&1; do sudo iptables -D DOCKER-USER $rule; done
+  done
+  # Inserted at position 1 in reverse order, so the chain reads ACCEPT tcp, ACCEPT udp, REJECT.
+  if sudo iptables -I DOCKER-USER 1 $reject \
+      && sudo iptables -I DOCKER-USER 1 $accept_udp \
+      && sudo iptables -I DOCKER-USER 1 $accept_tcp; then
+    echo "    containers can no longer reach 169.254.169.254."
+  else
+    echo "    WARN: could not install the rules; containers may still reach the metadata server."
+  fi
+  echo "    DNS to 169.254.169.254 still permitted (port 53 only)."
+fi
+
 # fortio — the load generator the chaos agent shells out to for `generate_load`
 # faults (e.g. the optimize-scale load spike). The chaos system instruction tells
 # the agent to use the `fortio` binary; without it on PATH the spike is a silent
