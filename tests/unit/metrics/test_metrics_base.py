@@ -32,7 +32,7 @@ from devops_bench.metrics.base import (
 # --- MetricScore.to_entry() — D3 legacy-shape preservation -------------------
 
 
-def test_tool_invocation_threshold_is_exported_from_base():
+def test_tool_invocation_threshold_is_exported_from_base() -> None:
     from devops_bench.metrics.tool_invocation import (
         TOOL_INVOCATION_THRESHOLD as tool_threshold,
     )
