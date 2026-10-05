@@ -31,6 +31,7 @@ __all__ = [
     "MetricContext",
     "MetricEvaluator",
     "MetricScore",
+    "TOOL_INVOCATION_THRESHOLD",
     "run_geval",
 ]
 
@@ -38,6 +39,11 @@ __all__ = [
 # 0.5; the builtin metrics deliberately score at 0.8, so every GEval-backed
 # metric passes this explicitly rather than inheriting the looser SDK default.
 GEVAL_PASS_THRESHOLD = 0.8
+
+# Pass cutoff for the ToolInvocation metric. Defined here (alongside
+# GEVAL_PASS_THRESHOLD) so callers that do not import deepeval can read the
+# canonical threshold without loading metrics.tool_invocation.
+TOOL_INVOCATION_THRESHOLD = 0.8
 
 # Entry-point discovery lets external packages add metrics.
 METRICS: Registry[type[MetricEvaluator]] = Registry(
