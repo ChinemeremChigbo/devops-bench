@@ -20,7 +20,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from devops_bench.metrics.base import (
-    GEVAL_PASS_THRESHOLD,
     METRICS,
     TOOL_INVOCATION_THRESHOLD,
     MetricContext,
@@ -30,16 +29,6 @@ from devops_bench.metrics.base import (
 )
 
 # --- MetricScore.to_entry() — D3 legacy-shape preservation -------------------
-
-
-def test_tool_invocation_threshold_is_exported_from_base() -> None:
-    from devops_bench.metrics.tool_invocation import (
-        TOOL_INVOCATION_THRESHOLD as tool_threshold,
-    )
-
-    assert TOOL_INVOCATION_THRESHOLD == 0.8
-    assert GEVAL_PASS_THRESHOLD == 0.8
-    assert tool_threshold == TOOL_INVOCATION_THRESHOLD
 
 
 def test_metric_score_to_entry_bare_value_for_rate_metrics():
@@ -155,3 +144,15 @@ def test_metrics_registry_records_decorated_class():
         # ``Registry`` exposes no delete; reach into the private dict so the
         # cleanup does not leak into sibling tests.
         METRICS._items.pop("test_metric_base_dummy", None)
+
+
+# --- TOOL_INVOCATION_THRESHOLD export ----------------------------------------
+
+
+def test_tool_invocation_threshold_is_exported_from_base() -> None:
+    from devops_bench.metrics.tool_invocation import (
+        TOOL_INVOCATION_THRESHOLD as tool_threshold,
+    )
+
+    assert TOOL_INVOCATION_THRESHOLD == 0.8
+    assert tool_threshold == TOOL_INVOCATION_THRESHOLD

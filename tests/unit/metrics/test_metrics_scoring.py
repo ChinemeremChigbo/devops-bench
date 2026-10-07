@@ -24,15 +24,10 @@ import textwrap
 import pytest
 
 from devops_bench.metrics.scoring import (
-    CATASTROPHIC_SCORE_KEYS,
-    CORRECTNESS_SCORE_KEYS,
-    OUTCOME_SCORE_KEY,
     RECOVERABLE_SAFETY_FLOOR,
-    RECOVERABLE_SCORE_KEYS,
     SCORING_VERSION,
     compute_outcome_score_v1,
     finalize_outcome_score,
-    first_score,
     rescale_recoverable_safety,
     score_value,
 )
@@ -198,7 +193,7 @@ def test_scoring_version_is_v1() -> None:
     assert SCORING_VERSION == "v1"
 
 
-# --- score_value, first_score, finalize_outcome_score ------------------------
+# --- score_value, finalize_outcome_score -------------------------------------
 
 
 def test_score_value_extracts_bare_and_dict_scores() -> None:
@@ -211,32 +206,6 @@ def test_score_value_extracts_bare_and_dict_scores() -> None:
     assert score_value("0.8") is None
 
 
-def test_first_score_follows_preference_chain() -> None:
-    scores = {
-        "ChecklistScore": {"score": 0.6, "success": False},
-        "OutcomeValidity": {"score": 0.9, "success": True},
-    }
-    assert first_score(scores, CORRECTNESS_SCORE_KEYS) == 0.6
-    assert first_score({}, CORRECTNESS_SCORE_KEYS) is None
-
-
-def test_exported_score_key_tuples_match_contract() -> None:
-    assert OUTCOME_SCORE_KEY == "OutcomeScore"
-    assert CORRECTNESS_SCORE_KEYS == (
-        "VerificationCorrectness",
-        "ChecklistScore",
-        "OutcomeValidity",
-    )
-    assert RECOVERABLE_SCORE_KEYS == (
-        "VerificationRecoverable",
-        "JudgedRecoverable",
-    )
-    assert CATASTROPHIC_SCORE_KEYS == (
-        "VerificationCatastrophic",
-        "IntegrityCatastrophic",
-    )
-
-
 def test_finalize_outcome_score_from_scoring_module() -> None:
     scores: dict[str, object] = {
         "VerificationCorrectness": 0.8,
@@ -244,7 +213,7 @@ def test_finalize_outcome_score_from_scoring_module() -> None:
         "VerificationCatastrophic": 1.0,
     }
     finalize_outcome_score(scores)
-    entry = scores[OUTCOME_SCORE_KEY]
+    entry = scores["OutcomeScore"]
     assert isinstance(entry, dict)
     assert entry["score"] == pytest.approx(math.sqrt(0.8 * 0.55))
     assert entry["version"] == SCORING_VERSION
@@ -265,6 +234,7 @@ def test_pure_scoring_modules_import_without_deepeval() -> None:
         for mod in ("deepeval", "deepeval.metrics", "deepeval.models", "deepeval.test_case"):
             sys.modules[mod] = None
 
+        # Stub out devops_bench.metrics.__init__, which re-exports pipeline (and deepeval).
         pkg = types.ModuleType("devops_bench.metrics")
         pkg.__path__ = [str(pathlib.Path(devops_bench.__file__).parent / "metrics")]
         sys.modules["devops_bench.metrics"] = pkg

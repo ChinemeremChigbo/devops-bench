@@ -35,7 +35,6 @@ __all__ = [
     "VERIFICATION_CORRECTNESS_KEY",
     "VERIFICATION_COVERAGE_KEY",
     "VERIFICATION_RECOVERABLE_KEY",
-    "VERIFICATION_SCORE_KEYS",
 ]
 
 #: The v1 composite assembled from the sub-scores below; the leaderboard row's
@@ -50,17 +49,6 @@ VERIFICATION_CORRECTNESS_KEY = "VerificationCorrectness"
 VERIFICATION_RECOVERABLE_KEY = "VerificationRecoverable"
 VERIFICATION_CATASTROPHIC_KEY = "VerificationCatastrophic"
 VERIFICATION_COVERAGE_KEY = "VerificationCoverage"
-
-#: Every key :class:`~devops_bench.metrics.verification.VerificationMetric` can
-#: emit. :data:`VERIFICATION_COVERAGE_KEY` is emitted whenever the metric
-#: applies, so the presence of any key in this tuple marks a record as already
-#: rolled up.
-VERIFICATION_SCORE_KEYS: tuple[str, ...] = (
-    VERIFICATION_CORRECTNESS_KEY,
-    VERIFICATION_RECOVERABLE_KEY,
-    VERIFICATION_CATASTROPHIC_KEY,
-    VERIFICATION_COVERAGE_KEY,
-)
 
 # --- judged signals, from prose checklists on the task ------------------------
 #: Correctness, and its fallback for tasks that author no checklist.

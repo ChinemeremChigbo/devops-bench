@@ -216,22 +216,3 @@ def test_it_is_in_the_builtin_metric_keys() -> None:
     from devops_bench.metrics.pipeline import _BUILTIN_METRIC_KEYS
 
     assert "verification" in _BUILTIN_METRIC_KEYS
-
-
-def test_verification_score_keys_matches_emitted_keys() -> None:
-    from devops_bench.core import score_keys
-    from devops_bench.metrics.verification import (
-        CATASTROPHIC_SCORE_KEY,
-        CORRECTNESS_SCORE_KEY,
-        COVERAGE_SCORE_KEY,
-        RECOVERABLE_SCORE_KEY,
-        VERIFICATION_SCORE_KEYS,
-    )
-
-    assert VERIFICATION_SCORE_KEYS is score_keys.VERIFICATION_SCORE_KEYS
-    assert VERIFICATION_SCORE_KEYS == (
-        CORRECTNESS_SCORE_KEY,
-        RECOVERABLE_SCORE_KEY,
-        CATASTROPHIC_SCORE_KEY,
-        COVERAGE_SCORE_KEY,
-    )

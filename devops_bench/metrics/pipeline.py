@@ -21,7 +21,7 @@ from typing import Any
 
 from deepeval.test_case import LLMTestCase
 
-from devops_bench.core import get_bool, get_logger
+from devops_bench.core import get_bool, get_logger, score_keys
 
 # Imported for their @METRICS.register side effects.
 from devops_bench.metrics import (
@@ -45,13 +45,7 @@ from devops_bench.metrics.checklist import (
     extract_checklist_items,
 )
 from devops_bench.metrics.scoring import (
-    CATASTROPHIC_SCORE_KEYS,
-    CORRECTNESS_SCORE_KEYS,
-    OUTCOME_SCORE_KEY,
-    RECOVERABLE_SCORE_KEYS,
-    finalize_outcome_score,
-    first_score,
-    score_value,
+    finalize_outcome_score as _finalize_outcome_score,
 )
 
 __all__ = [
@@ -60,18 +54,14 @@ __all__ = [
     "ChecklistMetric",
     "evaluate_metrics_batch",
     "extract_checklist_items",
-    "finalize_outcome_score",
 ]
 
 _log = get_logger("metrics.pipeline")
 
-# Private aliases retained for callers and tests importing from this module.
-_CORRECTNESS_KEYS = CORRECTNESS_SCORE_KEYS
-_RECOVERABLE_KEYS = RECOVERABLE_SCORE_KEYS
-_CATASTROPHIC_KEYS = CATASTROPHIC_SCORE_KEYS
-_score_value = score_value
-_first_score = first_score
-_finalize_outcome_score = finalize_outcome_score
+#: ``res["scores"]`` key carrying the v1 composite outcome score. Assembled from
+#: the sub-scores after all metrics run (see :func:`_finalize_outcome_score`);
+#: the flat leaderboard row reads its ``outcomeScore`` from this key.
+OUTCOME_SCORE_KEY = score_keys.OUTCOME_SCORE_KEY
 
 # Order in which builtin metric keys appear in results.json.
 _BUILTIN_METRIC_KEYS: tuple[str, ...] = (
